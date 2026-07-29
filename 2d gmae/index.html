@@ -85,6 +85,18 @@
   button.playBtn:hover { transform: translateY(-2px) scale(1.03); box-shadow: 0 10px 30px rgba(91,227,255,0.5); }
   button.playBtn:active { transform: translateY(0) scale(0.98); }
 
+  .phoneModeBtn {
+    padding: 9px 18px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.18);
+    background: rgba(255,255,255,0.05); color: var(--ui); font-size: 12.5px; font-weight: 700;
+    letter-spacing: 1px; cursor: pointer; touch-action: manipulation; opacity: 0.85;
+    transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease, opacity 0.15s ease;
+  }
+  .phoneModeBtn.on {
+    background: rgba(91,227,255,0.16); border-color: var(--accent); color: var(--accent);
+    box-shadow: 0 0 16px rgba(91,227,255,0.3); opacity: 1;
+  }
+  .phoneModeBtn:active { transform: scale(0.97); }
+
   #gameOverScreen h2 { font-size: 36px; margin: 0; color: var(--danger); letter-spacing: 3px; text-shadow: 0 0 24px rgba(255,77,94,0.4); }
   #finalStats { font-size: 16px; line-height: 2; opacity: 0.9; }
   #finalStats b { color: var(--xp); }
@@ -215,6 +227,21 @@
   }
 
   footer.credit { position: absolute; bottom: 8px; right: 12px; font-size: 10px; opacity: 0.3; pointer-events: none; }
+
+  #rotateOverlay {
+    position: fixed; inset: 0; z-index: 999; display: none;
+    flex-direction: column; align-items: center; justify-content: center; gap: 14px;
+    background: radial-gradient(circle at 50% 40%, rgba(20,22,40,0.98), rgba(6,7,14,0.99));
+    text-align: center; padding: 20px;
+  }
+  #rotateOverlay.show { display: flex; }
+  .rotateIcon { font-size: 56px; animation: rotateHint 1.6s ease-in-out infinite; }
+  @keyframes rotateHint {
+    0%, 100% { transform: rotate(0deg); }
+    50% { transform: rotate(-90deg); }
+  }
+  .rotateText { font-size: 20px; font-weight: 700; letter-spacing: 2px; color: var(--accent); text-shadow: 0 0 20px rgba(91,227,255,0.5); }
+  .rotateSub { font-size: 13px; opacity: 0.7; max-width: 320px; line-height: 1.5; }
 </style>
 </head>
 <body>
@@ -251,6 +278,7 @@
       <span class="key">Touch — stick to move, 2nd finger to aim & fire</span>
     </div>
     <button class="playBtn" id="startBtn">▶ START</button>
+    <button class="phoneModeBtn" id="phoneModeBtn">📱 PHONE MODE: OFF</button>
 
     <div class="panelBackdrop" id="panelBackdrop"></div>
     <div class="sideTab" id="sideTab"><span class="tabIcon">🎨</span><span class="tabLabel">CUSTOMIZE</span></div>
@@ -290,6 +318,12 @@
 
   <div id="joystick"><div id="stick"></div></div>
   <footer class="credit">NEON SWARM</footer>
+
+  <div id="rotateOverlay">
+    <div class="rotateIcon">📱</div>
+    <div class="rotateText">ROTATE YOUR DEVICE</div>
+    <div class="rotateSub">NEON SWARM plays best in landscape — turn your phone sideways to continue.</div>
+  </div>
 </div>
 
 <script>
@@ -361,10 +395,10 @@ const SAVE_KEY = 'neonSwarmSave';
 function loadSave() {
   try {
     const raw = localStorage.getItem(SAVE_KEY);
-    if (!raw) return { codes: [], skin: 'classic' };
+    if (!raw) return { codes: [], skin: 'classic', phoneMode: false };
     const d = JSON.parse(raw);
-    return { codes: Array.isArray(d.codes) ? d.codes : [], skin: d.skin || 'classic' };
-  } catch (e) { return { codes: [], skin: 'classic' }; }
+    return { codes: Array.isArray(d.codes) ? d.codes : [], skin: d.skin || 'classic', phoneMode: !!d.phoneMode };
+  } catch (e) { return { codes: [], skin: 'classic', phoneMode: false }; }
 }
 function persistSave() { localStorage.setItem(SAVE_KEY, JSON.stringify(save)); }
 let save = loadSave();
@@ -463,7 +497,42 @@ const stick = document.getElementById('stick');
 let joyActive = false, joyTouchId = null, joyOrigin = {x:0,y:0};
 
 function isTouchDevice() { return ('ontouchstart' in window) || navigator.maxTouchPoints > 0; }
-if (isTouchDevice()) joystick.classList.add('active');
+function touchModeActive() { return isTouchDevice() || save.phoneMode; }
+function updateJoystickVisibility() {
+  joystick.classList.toggle('active', touchModeActive() && gameState === 'playing');
+}
+
+// ---------- Force landscape on phones ----------
+const rotateOverlay = document.getElementById('rotateOverlay');
+function checkOrientation() {
+  const portrait = window.innerHeight > window.innerWidth;
+  if (touchModeActive() && portrait) rotateOverlay.classList.add('show');
+  else rotateOverlay.classList.remove('show');
+}
+window.addEventListener('resize', checkOrientation);
+window.addEventListener('orientationchange', checkOrientation);
+checkOrientation();
+document.getElementById('startBtn').addEventListener('click', () => {
+  if (!touchModeActive() || !screen.orientation || !screen.orientation.lock) return;
+  const el = document.documentElement;
+  const req = el.requestFullscreen || el.webkitRequestFullscreen;
+  if (req) { try { req.call(el).then(() => screen.orientation.lock('landscape').catch(()=>{})).catch(()=>{}); } catch(e) {} }
+});
+
+// ---------- Manual "Phone Mode" toggle ----------
+const phoneModeBtn = document.getElementById('phoneModeBtn');
+function renderPhoneModeBtn() {
+  phoneModeBtn.textContent = `📱 PHONE MODE: ${save.phoneMode ? 'ON' : 'OFF'}`;
+  phoneModeBtn.classList.toggle('on', save.phoneMode);
+}
+phoneModeBtn.addEventListener('click', () => {
+  save.phoneMode = !save.phoneMode;
+  persistSave();
+  renderPhoneModeBtn();
+  updateJoystickVisibility();
+  checkOrientation();
+});
+renderPhoneModeBtn();
 
 canvas.addEventListener('touchstart', e => {
   ensureAudio();
@@ -1159,6 +1228,9 @@ function loop(ts) {
   let dt = (ts - lastTime) / 1000;
   lastTime = ts;
   dt = Math.min(dt, 0.05);
+
+  updateJoystickVisibility();
+  if (rotateOverlay.classList.contains('show')) return;
 
   if (gameState === 'playing') {
     elapsed += dt;
