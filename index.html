@@ -43,8 +43,16 @@
   #hpFill { background: linear-gradient(90deg, #ff4d5e, #ff8a5b); }
   #xpFill { background: linear-gradient(90deg, #ffd24d, #ffef8a); }
 
-  #stats { text-align: right; font-size: 13px; line-height: 1.6; opacity: 0.9; }
+  #stats { text-align: right; font-size: 13px; line-height: 1.6; opacity: 0.9; margin-top: 46px; }
   #stats b { color: var(--accent); font-size: 16px; }
+
+  #pauseBtn {
+    position: absolute; top: 14px; right: 18px; width: 38px; height: 38px;
+    border-radius: 10px; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.2);
+    color: var(--ui); font-size: 16px; display: flex; align-items: center; justify-content: center;
+    cursor: pointer; pointer-events: auto; touch-action: manipulation;
+  }
+  #pauseBtn:active { background: rgba(255,255,255,0.18); transform: scale(0.93); }
 
   #center-msg {
     position: absolute; top: 40%; left: 50%; transform: translate(-50%, -50%);
@@ -266,6 +274,7 @@
       <div>wave <span id="waveVal">1</span> &middot; kills <span id="killVal">0</span></div>
       <div id="timeVal">00:00</div>
     </div>
+    <button id="pauseBtn" title="Pause">⏸</button>
   </div>
 
   <div id="center-msg"><div class="big" id="center-msg-text">WAVE 2</div></div>
@@ -1324,6 +1333,7 @@ function goToMenu() {
 document.getElementById('startBtn').addEventListener('click', startGame);
 document.getElementById('retryBtn').addEventListener('click', startGame);
 document.getElementById('resumeBtn').addEventListener('click', togglePause);
+document.getElementById('pauseBtn').addEventListener('click', () => { ensureAudio(); togglePause(); });
 document.getElementById('menuFromPauseBtn').addEventListener('click', goToMenu);
 document.getElementById('menuFromGameOverBtn').addEventListener('click', goToMenu);
 
