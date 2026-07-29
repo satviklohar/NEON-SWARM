@@ -23,7 +23,7 @@
     user-select: none;
   }
   #wrap { position: relative; width: 100vw; height: 100vh; }
-  canvas { display: block; width: 100%; height: 100%; background: var(--bg); }
+  canvas { display: block; width: 100%; height: 100%; background: var(--bg); touch-action: none; }
 
   #hud {
     position: absolute; top: 0; left: 0; right: 0;
@@ -84,6 +84,14 @@
   }
   button.playBtn:hover { transform: translateY(-2px) scale(1.03); box-shadow: 0 10px 30px rgba(91,227,255,0.5); }
   button.playBtn:active { transform: translateY(0) scale(0.98); }
+
+  .menuBtn {
+    padding: 12px 30px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.2);
+    background: rgba(255,255,255,0.05); color: var(--ui); font-size: 13.5px; font-weight: 700;
+    letter-spacing: 1px; cursor: pointer; touch-action: manipulation; opacity: 0.85;
+    transition: background 0.15s ease, opacity 0.15s ease;
+  }
+  .menuBtn:active { transform: scale(0.97); opacity: 1; background: rgba(255,255,255,0.1); }
 
   .phoneModeBtn {
     padding: 9px 18px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.18);
@@ -217,7 +225,7 @@
   #joystick {
     position: absolute; bottom: 30px; left: 30px; width: 120px; height: 120px;
     border-radius: 50%; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.15);
-    display: none; touch-action: none;
+    display: none; touch-action: none; pointer-events: none;
   }
   #joystick.active { display: block; }
   #stick {
@@ -302,6 +310,7 @@
   <div id="pauseScreen">
     <h2>PAUSED</h2>
     <button class="playBtn" id="resumeBtn">▶ RESUME</button>
+    <button class="menuBtn" id="menuFromPauseBtn">🏠 MAIN MENU</button>
   </div>
 
   <div id="levelUpScreen">
@@ -314,6 +323,7 @@
     <h2>YOU FELL</h2>
     <div id="finalStats"></div>
     <button class="playBtn" id="retryBtn">↻ TRY AGAIN</button>
+    <button class="menuBtn" id="menuFromGameOverBtn">🏠 MAIN MENU</button>
   </div>
 
   <div id="joystick"><div id="stick"></div></div>
@@ -576,18 +586,42 @@ function endTouch(e) {
 canvas.addEventListener('touchend', endTouch, {passive:true});
 canvas.addEventListener('touchcancel', endTouch, {passive:true});
 
-// ---------- Mouse aim/fire ----------
+// ---------- Mouse aim/fire (+ drag the joystick with the mouse when touch mode is forced) ----------
 let mouseScreen = {x: null, y: null};
 let aimScreen = null, aimTouchId = null;
 let isFiring = false;
+let joyMouseDown = false;
 canvas.style.cursor = 'crosshair';
-window.addEventListener('mousemove', e => { mouseScreen.x = e.clientX; mouseScreen.y = e.clientY; });
+window.addEventListener('mousemove', e => {
+  mouseScreen.x = e.clientX; mouseScreen.y = e.clientY;
+  if (joyMouseDown) {
+    let dx = e.clientX - joyOrigin.x, dy = e.clientY - joyOrigin.y;
+    const m = Math.hypot(dx, dy), max = 50;
+    if (m > max) { dx = dx/m*max; dy = dy/m*max; }
+    stick.style.left = (33 + dx) + 'px'; stick.style.top = (33 + dy) + 'px';
+    joyVec.x = dx / max; joyVec.y = dy / max;
+  }
+});
 canvas.addEventListener('mousedown', e => {
   if (e.button !== 0) return;
-  ensureAudio(); isFiring = true;
+  ensureAudio();
+  if (touchModeActive() && e.clientX < W*0.5) {
+    joyMouseDown = true;
+    joyOrigin = {x: e.clientX, y: e.clientY};
+    joystick.style.left = (e.clientX - 60) + 'px';
+    joystick.style.top = (e.clientY - 60) + 'px';
+    joystick.style.bottom = 'auto';
+  } else {
+    isFiring = true;
+  }
 });
-window.addEventListener('mouseup', e => { if (e.button === 0) isFiring = false; });
-window.addEventListener('blur', () => { isFiring = false; });
+function releaseJoyMouse() {
+  if (!joyMouseDown) return;
+  joyMouseDown = false; joyVec = {x:0,y:0};
+  stick.style.left = '33px'; stick.style.top = '33px';
+}
+window.addEventListener('mouseup', e => { if (e.button === 0) { isFiring = false; releaseJoyMouse(); } });
+window.addEventListener('blur', () => { isFiring = false; releaseJoyMouse(); });
 canvas.addEventListener('contextmenu', e => e.preventDefault());
 
 function getAimWorldPos() {
@@ -1276,9 +1310,22 @@ function startGame() {
   showCenterMsg('WAVE 1');
 }
 
+// ---------- Back to menu ----------
+function goToMenu() {
+  gameState = 'start';
+  if (levelUpKeyHandler) { window.removeEventListener('keydown', levelUpKeyHandler); levelUpKeyHandler = null; }
+  document.getElementById('pauseScreen').style.display = 'none';
+  document.getElementById('gameOverScreen').style.display = 'none';
+  document.getElementById('levelUpScreen').style.display = 'none';
+  document.getElementById('bossBar').classList.remove('show');
+  document.getElementById('startScreen').style.display = 'flex';
+}
+
 document.getElementById('startBtn').addEventListener('click', startGame);
 document.getElementById('retryBtn').addEventListener('click', startGame);
 document.getElementById('resumeBtn').addEventListener('click', togglePause);
+document.getElementById('menuFromPauseBtn').addEventListener('click', goToMenu);
+document.getElementById('menuFromGameOverBtn').addEventListener('click', goToMenu);
 
 gameState = 'start';
 resetGame();
