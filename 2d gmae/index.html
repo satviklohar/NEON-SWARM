@@ -510,8 +510,29 @@ const CODES = {
   'GHOSTLY':     { desc: 'unlocked GHOST skin, +50 pickup radius', skin: 'ghost', buff: p => { p.magnet += 50; } },
   'VOIDWALKER':  { desc: 'unlocked VOID skin, +15% crit chance', skin: 'void', buff: p => { p.critChance += 0.15; } },
   'CRIMSONTIDE': { desc: 'unlocked CRIMSON skin, +1 pierce', skin: 'crimson', buff: p => { p.pierce += 1; } },
-  'SATVIK': { desc: 'ADMIN MODE — invincibility, one-shot kills, unlocked ADMIN skin', skin: 'admin', buff: p => { p.admin = true; p.dmg *= 25; p.maxHp = 9999; p.hp = p.maxHp; p.pierce += 10; } },
+  'SATVIK': { desc: 'ADMIN MODE — invincibility, one-shot kills, unlocked ADMIN skin', skin: 'admin', buff: p => enableAdmin(p) },
 };
+
+function enableAdmin(p) {
+  if (p.admin) return;
+  p.adminSnapshot = { dmg: p.dmg, maxHp: p.maxHp, hp: p.hp, pierce: p.pierce };
+  p.admin = true;
+  p.dmg *= 25;
+  p.maxHp = 9999;
+  p.hp = p.maxHp;
+  p.pierce += 10;
+}
+function disableAdmin(p) {
+  if (!p.admin) return;
+  p.admin = false;
+  if (p.adminSnapshot) {
+    p.dmg = p.adminSnapshot.dmg;
+    p.maxHp = p.adminSnapshot.maxHp;
+    p.hp = Math.min(p.adminSnapshot.hp, p.maxHp);
+    p.pierce = p.adminSnapshot.pierce;
+    p.adminSnapshot = null;
+  }
+}
 
 function unlockedSkins() {
   const set = new Set(['classic']);
@@ -794,7 +815,7 @@ function makePlayer() {
     critChance: 0.05,
     invuln: 0,
     facing: {x:1, y:0},
-    admin: false,
+    admin: false, adminSnapshot: null,
     slowUntil: 0, slowMul: 1,
   };
   applyUnlockedBuffs(p);
@@ -1730,6 +1751,7 @@ const ADMIN_ACTIONS = [
   { label:'💰 +1000 Score', fn: () => { score += 1000; } },
   { label:'⬆️ +1 Level', fn: () => { player.level += 1; player.xp = 0; } },
   { label:'🧲 XP Burst', fn: () => { for (let i=0;i<5;i++) spawnGem(player.x + rand(-40,40), player.y + rand(-40,40), 20); } },
+  { label:'🚫 Disable Admin Mode', fn: () => { disableAdmin(player); } },
 ];
 
 function buildAdminStats() {
@@ -1771,6 +1793,7 @@ function buildAdminActions() {
     const btn = document.createElement('button');
     btn.className = 'adminActionBtn';
     btn.textContent = a.label;
+    if (a.key) btn.dataset.key = a.key;
     btn.onclick = () => { a.fn(); refreshAdminValues(); };
     adminActionsEl.appendChild(btn);
   }
