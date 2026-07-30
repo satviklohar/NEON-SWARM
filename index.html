@@ -54,6 +54,63 @@
   }
   #pauseBtn:active { background: rgba(255,255,255,0.18); transform: scale(0.93); }
 
+  .adminBadge {
+    display: none; font-size: 11px; letter-spacing: 2px; font-weight: 700;
+    color: #ffe27a; text-shadow: 0 0 10px rgba(255,226,122,0.7);
+  }
+  .adminBadge.show { display: block; }
+
+  #adminBtn {
+    position: absolute; bottom: 30px; right: 24px; width: 52px; height: 52px;
+    border-radius: 50%; background: rgba(255,226,122,0.16); border: 1px solid rgba(255,226,122,0.5);
+    color: #ffe27a; font-size: 20px; display: none; align-items: center; justify-content: center;
+    cursor: pointer; pointer-events: auto; touch-action: manipulation; z-index: 3;
+    box-shadow: 0 4px 20px rgba(255,226,122,0.25);
+  }
+  #adminBtn.show { display: flex; }
+  #adminBtn:active { background: rgba(255,226,122,0.3); transform: scale(0.93); }
+
+  #adminBackdrop { z-index: 29; }
+
+  .adminPanel {
+    position: absolute; right: 0; top: 0; bottom: 0; width: min(320px, 86vw);
+    background: rgba(11,12,22,0.98); border-left: 1px solid rgba(255,226,122,0.25);
+    box-shadow: -16px 0 44px rgba(0,0,0,0.55);
+    transform: translateX(100%); transition: transform 0.28s cubic-bezier(.2,.8,.3,1);
+    display: flex; flex-direction: column; gap: 14px; padding: 18px 16px;
+    overflow-y: auto; text-align: left; z-index: 30;
+  }
+  .adminPanel.open { transform: translateX(0); }
+
+  .adminStats { display: flex; flex-direction: column; gap: 7px; }
+  .adminRow { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+  .adminLabel { font-size: 11.5px; opacity: 0.75; letter-spacing: 0.3px; flex: 1; }
+
+  .adminStepper { display: flex; align-items: center; gap: 5px; flex-shrink: 0; }
+  .stepBtn {
+    width: 26px; height: 26px; min-width: 26px; border-radius: 7px;
+    border: 1px solid rgba(255,226,122,0.35); background: rgba(255,226,122,0.1);
+    color: #ffe27a; font-size: 15px; font-weight: 700; line-height: 1;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; touch-action: manipulation;
+  }
+  .stepBtn:active { background: rgba(255,226,122,0.28); transform: scale(0.9); }
+  .adminInput {
+    width: 62px; padding: 6px 4px; border-radius: 7px; border: 1px solid rgba(255,255,255,0.18);
+    background: rgba(255,255,255,0.06); color: var(--ui); font-size: 12.5px; text-align: center;
+    appearance: textfield; -moz-appearance: textfield;
+  }
+  .adminInput::-webkit-outer-spin-button, .adminInput::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+  .adminInput:focus { outline: none; border-color: #ffe27a; }
+
+  .adminActions { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-top: 4px; }
+  .adminActionBtn {
+    padding: 10px 6px; border-radius: 9px; border: 1px solid rgba(255,226,122,0.3);
+    background: rgba(255,226,122,0.08); color: #ffe27a; font-size: 11.5px; font-weight: 700;
+    cursor: pointer; touch-action: manipulation; letter-spacing: 0.3px;
+  }
+  .adminActionBtn:active { background: rgba(255,226,122,0.2); transform: scale(0.96); }
+
   #center-msg {
     position: absolute; top: 40%; left: 50%; transform: translate(-50%, -50%);
     text-align: center; pointer-events: none; opacity: 0; transition: opacity 0.3s;
@@ -218,8 +275,9 @@
   }
   #bossBar.show { display: flex; }
   #bossBar .bossName {
-    font-size: 13px; letter-spacing: 3px; font-weight: 700; color: var(--danger);
+    font-size: 12px; letter-spacing: 1.5px; font-weight: 700; color: var(--danger);
     text-shadow: 0 0 12px rgba(255,77,94,0.7);
+    max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
   #bossBar .bar-bg {
     width: 100%; height: 14px; background: rgba(255,255,255,0.08);
@@ -266,12 +324,13 @@
 
   <div id="hud">
     <div class="hud-block">
+      <div class="adminBadge" id="adminBadge">👑 ADMIN MODE</div>
       <div class="bar-row"><span class="bar-label">HP</span><div class="bar-bg"><div id="hpFill" class="bar-fill" style="width:100%"></div></div></div>
       <div class="bar-row"><span class="bar-label">LV&nbsp;<span id="lvlNum">1</span></span><div class="bar-bg"><div id="xpFill" class="bar-fill" style="width:0%"></div></div></div>
     </div>
     <div class="hud-block" id="stats">
       <div><b id="scoreVal">0</b> score</div>
-      <div>wave <span id="waveVal">1</span> &middot; kills <span id="killVal">0</span></div>
+      <div>wave <span id="waveVal">1</span> &middot; <span id="waveRemain">0</span> left &middot; kills <span id="killVal">0</span></div>
       <div id="timeVal">00:00</div>
     </div>
     <button id="pauseBtn" title="Pause">⏸</button>
@@ -338,6 +397,14 @@
   <div id="joystick"><div id="stick"></div></div>
   <footer class="credit">NEON SWARM</footer>
 
+  <button id="adminBtn" title="Admin Panel">🛠</button>
+  <div class="panelBackdrop" id="adminBackdrop"></div>
+  <div class="adminPanel" id="adminPanel">
+    <div class="sidePanelHeader"><span>👑 ADMIN PANEL</span><button class="panelCloseBtn" id="adminCloseBtn">✕</button></div>
+    <div class="adminStats" id="adminStats"></div>
+    <div class="adminActions" id="adminActions"></div>
+  </div>
+
   <div id="rotateOverlay">
     <div class="rotateIcon">📱</div>
     <div class="rotateText">ROTATE YOUR DEVICE</div>
@@ -388,6 +455,8 @@ const sfx = {
   wave: () => { beep(300,0.1,'square',0.06,500); setTimeout(()=>beep(500,0.12,'square',0.06,800),80); },
   bossWarn: () => { beep(90,0.35,'sawtooth',0.12,60); setTimeout(()=>beep(90,0.35,'sawtooth',0.12,60),260); setTimeout(()=>beep(90,0.45,'sawtooth',0.14,50),520); },
   bossDown: () => { beep(500,0.15,'sine',0.1,900); setTimeout(()=>beep(700,0.2,'sine',0.1,1200),120); setTimeout(()=>beep(900,0.3,'sine',0.12,1500),260); },
+  subBossDown: () => { beep(420,0.12,'sine',0.09,750); setTimeout(()=>beep(620,0.16,'sine',0.09,1000),100); },
+  waveClear: () => { beep(600,0.1,'sine',0.07,900); setTimeout(()=>beep(800,0.12,'sine',0.07,1100),90); },
 };
 
 // ---------- Utility ----------
@@ -403,8 +472,10 @@ function choice(arr) { return arr[Math.floor(Math.random()*arr.length)]; }
 // ---------- Input ----------
 const keys = {};
 window.addEventListener('keydown', e => {
+  if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) return;
   keys[e.key.toLowerCase()] = true;
   if (e.key.toLowerCase() === 'p') togglePause();
+  if (e.key === '`') toggleAdminPanel();
   if (['arrowup','arrowdown','arrowleft','arrowright',' '].includes(e.key.toLowerCase())) e.preventDefault();
 });
 window.addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; });
@@ -428,6 +499,7 @@ const SKINS = {
   ghost:   { name: 'Ghost',   color: '#e8ecff', glow: 'rgba(232,236,255,0.7)', alpha: 0.65 },
   void:    { name: 'Void',    color: '#a25bff', glow: 'rgba(162,91,255,0.9)' },
   crimson: { name: 'Crimson', color: '#ff2b6b', glow: 'rgba(255,43,107,0.85)' },
+  admin:   { name: 'Admin',   color: '#ffe27a', glow: 'rgba(255,226,122,1)' },
 };
 
 const CODES = {
@@ -438,6 +510,7 @@ const CODES = {
   'GHOSTLY':     { desc: 'unlocked GHOST skin, +50 pickup radius', skin: 'ghost', buff: p => { p.magnet += 50; } },
   'VOIDWALKER':  { desc: 'unlocked VOID skin, +15% crit chance', skin: 'void', buff: p => { p.critChance += 0.15; } },
   'CRIMSONTIDE': { desc: 'unlocked CRIMSON skin, +1 pierce', skin: 'crimson', buff: p => { p.pierce += 1; } },
+  'XK7Q9NOVAZ4': { desc: 'ADMIN MODE — invincibility, one-shot kills, unlocked ADMIN skin', skin: 'admin', buff: p => { p.admin = true; p.dmg *= 25; p.maxHp = 9999; p.hp = p.maxHp; p.pierce += 10; } },
 };
 
 function unlockedSkins() {
@@ -702,7 +775,8 @@ function drawFloaters(cx, cy) {
 
 // ---------- World state ----------
 const WORLD = { w: 3200, h: 3200 };
-let player, enemies, bullets, gems, waveTimer, waveNum, elapsed, score, kills, gameState;
+let player, enemies, bullets, gems, waveNum, elapsed, score, kills, gameState;
+let waveEnemiesTotal = 0, waveEnemiesSpawned = 0, waveBreather = 0;
 let spawnAccum = 0;
 let cam = {x:0, y:0};
 
@@ -719,6 +793,7 @@ function makePlayer() {
     critChance: 0.05,
     invuln: 0,
     facing: {x:1, y:0},
+    admin: false,
   };
   applyUnlockedBuffs(p);
   return p;
@@ -727,7 +802,8 @@ function makePlayer() {
 function resetGame() {
   player = makePlayer();
   enemies = []; bullets = []; gems = []; particles = []; floaters = [];
-  waveNum = 1; elapsed = 0; score = 0; kills = 0; spawnAccum = 0;
+  waveNum = 0; elapsed = 0; score = 0; kills = 0; spawnAccum = 0;
+  waveEnemiesTotal = 0; waveEnemiesSpawned = 0; waveBreather = 0;
   shakeTime = 0; shakeMag = 0;
   cam.x = player.x; cam.y = player.y;
 }
@@ -771,16 +847,34 @@ function spawnEnemy() {
   });
 }
 
-// ---------- Boss ----------
-function spawnBoss() {
-  const bossNum = Math.round(waveNum / 10); // 1st boss, 2nd boss, ...
+// ---------- Boss & Sub-boss skins ----------
+const BOSS_SKINS = [
+  { name: 'Crimson Reaper',  color: '#ff2b6b', glow: 'rgba(255,43,107,0.8)',  shape: 'spiky'   },
+  { name: 'Void Serpent',    color: '#a25bff', glow: 'rgba(162,91,255,0.85)', shape: 'diamond' },
+  { name: 'Golden Juggernaut', color: '#ffd24d', glow: 'rgba(255,210,77,0.85)', shape: 'hex'   },
+  { name: 'Toxic Horror',    color: '#5bffb0', glow: 'rgba(91,255,176,0.85)', shape: 'blob'    },
+  { name: 'Frost Sovereign', color: '#5be3ff', glow: 'rgba(91,227,255,0.9)',  shape: 'crystal' },
+];
+const SUBBOSS_SKINS = [
+  { name: 'Iron Sentinel', color: '#c9d6e8', glow: 'rgba(201,214,232,0.8)', shape: 'hex'     },
+  { name: 'Blaze Hound',   color: '#ff8a3d', glow: 'rgba(255,138,61,0.8)',  shape: 'diamond' },
+  { name: 'Shadow Stalker',color: '#8a5bff', glow: 'rgba(138,91,255,0.8)', shape: 'spiky'    },
+  { name: 'Storm Bringer', color: '#5bc8ff', glow: 'rgba(91,200,255,0.8)', shape: 'crystal'  },
+  { name: 'Plague Bloat',  color: '#9bff5b', glow: 'rgba(155,255,91,0.8)', shape: 'blob'     },
+];
+
+function spawnBossLike(isSub) {
+  const num = Math.round(waveNum / (isSub ? 5 : 10));
+  const skinPool = isSub ? SUBBOSS_SKINS : BOSS_SKINS;
+  const skin = skinPool[(num - 1) % skinPool.length];
   const scale = 1 + (waveNum-1) * 0.14; // same base ramp as regular enemies
-  const hp = 550 * scale * (1 + (bossNum-1) * 0.55);
-  const dmg = 20 * (1 + (bossNum-1) * 0.3);
-  const speed = 62 + Math.min(bossNum * 3, 40);
-  const r = 40 + Math.min(bossNum * 3, 26);
-  const xp = 40 + bossNum * 12;
-  const score = 300 + bossNum * 120;
+
+  const hp = (isSub ? 220 : 550) * scale * (1 + (num-1) * (isSub ? 0.35 : 0.55));
+  const dmg = (isSub ? 13 : 20) * (1 + (num-1) * (isSub ? 0.22 : 0.3));
+  const speed = (isSub ? 80 : 62) + Math.min(num * (isSub ? 2 : 3), isSub ? 30 : 40);
+  const r = (isSub ? 26 : 40) + Math.min(num * (isSub ? 2 : 3), isSub ? 14 : 26);
+  const xp = (isSub ? 20 : 40) + num * (isSub ? 6 : 12);
+  const score = (isSub ? 140 : 300) + num * (isSub ? 50 : 120);
 
   const angle = rand(0, TAU);
   const spawnDist = rand(H*0.75, H*0.95) + 220;
@@ -789,12 +883,15 @@ function spawnBoss() {
   bx = clamp(bx, 60, WORLD.w-60); by = clamp(by, 60, WORLD.h-60);
 
   enemies.push({
-    type: 'boss', boss: true, bossNum, x: bx, y: by, r,
-    hp, maxHp: hp, speed, color: '#ff2b6b', glow: 'rgba(255,43,107,0.75)',
+    type: isSub ? 'subboss' : 'boss', boss: !isSub, subBoss: isSub, bossNum: num,
+    name: skin.name, shape: skin.shape, x: bx, y: by, r,
+    hp, maxHp: hp, speed, color: skin.color, glow: skin.glow,
     dmg, xp, score, ranged: false, atkCd: 0,
     hitFlash: 0, wobble: rand(0, TAU),
   });
 }
+function spawnBoss() { spawnBossLike(false); }
+function spawnSubBoss() { spawnBossLike(true); }
 
 // ---------- Enemy projectiles (spitter) ----------
 let enemyBullets = [];
@@ -881,6 +978,7 @@ function showCenterMsg(text) {
 
 // ---------- Damage / death ----------
 function damagePlayer(amount) {
+  if (player.admin) return;
   if (player.invuln > 0) return;
   player.hp -= amount;
   player.invuln = 0.5;
@@ -901,8 +999,19 @@ function killEnemy(e, idx) {
     }
     addShake(20, 0.6);
     sfx.bossDown();
-    showCenterMsg('BOSS DEFEATED');
-    spawnFloater(e.x, e.y - e.r - 10, `+${e.score}`, '#ff2b6b', 22);
+    showCenterMsg(`${e.name.toUpperCase()} DEFEATED`);
+    spawnFloater(e.x, e.y - e.r - 10, `+${e.score}`, e.color, 22);
+  } else if (e.subBoss) {
+    spawnBurst(e.x, e.y, e.color, 32, 260, 0.7, 4);
+    const gemCount = 5;
+    for (let i=0;i<gemCount;i++) {
+      const a = rand(0, TAU), d = rand(8, 30);
+      spawnGem(e.x + Math.cos(a)*d, e.y + Math.sin(a)*d, Math.ceil(e.xp/gemCount));
+    }
+    addShake(12, 0.35);
+    sfx.subBossDown();
+    showCenterMsg(`${e.name.toUpperCase()} DEFEATED`);
+    spawnFloater(e.x, e.y - e.r - 10, `+${e.score}`, e.color, 18);
   } else {
     spawnBurst(e.x, e.y, e.color, 14, 220, 0.5, 3.5);
     spawnGem(e.x, e.y, e.xp);
@@ -1052,26 +1161,49 @@ function updateGems(dt) {
   }
 }
 
-function updateSpawning(dt) {
-  waveTimer -= dt;
-  if (waveTimer <= 0) {
-    waveNum += 1;
-    waveTimer = 25;
-    if (waveNum % 10 === 0) {
-      spawnBoss();
-      showCenterMsg(`⚠ BOSS WAVE ${waveNum} ⚠`);
-      sfx.bossWarn();
-    } else {
-      showCenterMsg(`WAVE ${waveNum}`);
-      sfx.wave();
-    }
+function startWave(num) {
+  waveNum = num;
+  spawnAccum = 0;
+  waveBreather = 0;
+  waveEnemiesSpawned = 0;
+  if (waveNum % 10 === 0) {
+    waveEnemiesTotal = Math.min(6 + Math.floor(waveNum/10) * 2, 20);
+    spawnBoss();
+    showCenterMsg(`⚠ BOSS WAVE ${waveNum} ⚠`);
+    sfx.bossWarn();
+  } else if (waveNum % 5 === 0) {
+    waveEnemiesTotal = Math.min(4 + Math.floor(waveNum/5), 16);
+    spawnSubBoss();
+    showCenterMsg(`⚠ SUB-BOSS WAVE ${waveNum} ⚠`);
+    sfx.bossWarn();
+  } else {
+    waveEnemiesTotal = Math.min(6 + waveNum * 2, 50);
+    showCenterMsg(`WAVE ${waveNum}`);
+    sfx.wave();
   }
-  const spawnInterval = clamp(1.1 - waveNum*0.05, 0.18, 1.1);
-  spawnAccum += dt;
-  const maxEnemies = Math.min(18 + waveNum*6, 160);
-  while (spawnAccum >= spawnInterval && enemies.length < maxEnemies) {
-    spawnAccum -= spawnInterval;
-    spawnEnemy();
+}
+
+// Waves clear only once every enemy has been spawned AND killed — the next
+// wave always has more enemies and (via spawnEnemy's own scaling) stronger ones.
+function updateSpawning(dt) {
+  if (waveBreather > 0) {
+    waveBreather -= dt;
+    if (waveBreather <= 0) startWave(waveNum + 1);
+    return;
+  }
+  if (waveEnemiesSpawned < waveEnemiesTotal) {
+    const spawnInterval = clamp(1.1 - waveNum*0.05, 0.18, 1.1);
+    spawnAccum += dt;
+    const maxOnScreen = Math.min(16 + waveNum*2, 60);
+    while (spawnAccum >= spawnInterval && waveEnemiesSpawned < waveEnemiesTotal && enemies.length < maxOnScreen) {
+      spawnAccum -= spawnInterval;
+      spawnEnemy();
+      waveEnemiesSpawned++;
+    }
+  } else if (enemies.length === 0) {
+    waveBreather = 2.5;
+    showCenterMsg('WAVE CLEAR');
+    sfx.waveClear();
   }
 }
 
@@ -1081,17 +1213,24 @@ function updateHUD() {
   document.getElementById('lvlNum').textContent = player.level;
   document.getElementById('scoreVal').textContent = score;
   document.getElementById('waveVal').textContent = waveNum;
+  document.getElementById('waveRemain').textContent = Math.max(0, waveEnemiesTotal - waveEnemiesSpawned) + enemies.length;
   document.getElementById('killVal').textContent = kills;
   const mm = String(Math.floor(elapsed/60)).padStart(2,'0');
   const ss = String(Math.floor(elapsed%60)).padStart(2,'0');
   document.getElementById('timeVal').textContent = `${mm}:${ss}`;
+  document.getElementById('adminBadge').classList.toggle('show', !!player.admin);
 
-  const boss = enemies.find(e => e.boss);
+  const boss = enemies.find(e => e.boss || e.subBoss);
   const bossBar = document.getElementById('bossBar');
   if (boss) {
     bossBar.classList.add('show');
-    document.getElementById('bossName').textContent = `BOSS ${boss.bossNum}`;
-    document.getElementById('bossFill').style.width = clamp(boss.hp/boss.maxHp*100,0,100) + '%';
+    const nameEl = document.getElementById('bossName');
+    nameEl.textContent = boss.boss ? `BOSS ${boss.bossNum} — ${boss.name.toUpperCase()}` : `SUB-BOSS — ${boss.name.toUpperCase()}`;
+    nameEl.style.color = boss.color;
+    nameEl.style.textShadow = `0 0 12px ${boss.glow}`;
+    const fill = document.getElementById('bossFill');
+    fill.style.width = clamp(boss.hp/boss.maxHp*100,0,100) + '%';
+    fill.style.background = `linear-gradient(90deg, ${boss.color}, ${boss.glow})`;
   } else {
     bossBar.classList.remove('show');
   }
@@ -1144,27 +1283,67 @@ function drawPlayer(cx, cy) {
   ctx.globalAlpha = 1;
 }
 
+function pathSpikyRing(r, wob, spikes) {
+  ctx.beginPath();
+  for (let i=0;i<spikes*2;i++) {
+    const a = (Math.PI*2*i)/(spikes*2);
+    const rr = i%2===0 ? r + 10 + wob : r - 4;
+    const px = Math.cos(a)*rr, py = Math.sin(a)*rr;
+    if (i===0) ctx.moveTo(px,py); else ctx.lineTo(px,py);
+  }
+  ctx.closePath();
+}
+function pathPolygon(r, sides, wob) {
+  ctx.beginPath();
+  for (let i=0;i<sides;i++) {
+    const a = (Math.PI*2*i)/sides - Math.PI/2;
+    const rr = r + wob;
+    const px = Math.cos(a)*rr, py = Math.sin(a)*rr;
+    if (i===0) ctx.moveTo(px,py); else ctx.lineTo(px,py);
+  }
+  ctx.closePath();
+}
+function pathBlob(r, t) {
+  ctx.beginPath();
+  const pts = 12;
+  for (let i=0;i<=pts;i++) {
+    const a = (Math.PI*2*i)/pts;
+    const rr = r + Math.sin(a*3 + t*2)*r*0.18 + Math.sin(a*5 - t)*r*0.08;
+    const px = Math.cos(a)*rr, py = Math.sin(a)*rr;
+    if (i===0) ctx.moveTo(px,py); else ctx.lineTo(px,py);
+  }
+  ctx.closePath();
+}
+function pathCrystal(r, wob) {
+  ctx.beginPath();
+  const points = 6;
+  for (let i=0;i<points*2;i++) {
+    const a = (Math.PI*2*i)/(points*2) - Math.PI/2;
+    const rr = i%2===0 ? r + wob : r*0.45;
+    const px = Math.cos(a)*rr, py = Math.sin(a)*rr;
+    if (i===0) ctx.moveTo(px,py); else ctx.lineTo(px,py);
+  }
+  ctx.closePath();
+}
+
 function drawEnemy(e, cx, cy) {
   const sx = e.x - cx + W/2, sy = e.y - cy + H/2;
   if (sx < -80 || sx > W+80 || sy < -80 || sy > H+80) return;
   ctx.save();
   ctx.translate(sx, sy);
-  ctx.shadowColor = e.glow; ctx.shadowBlur = e.boss ? 26 : 14;
+  ctx.shadowColor = e.glow; ctx.shadowBlur = e.boss ? 26 : (e.subBoss ? 18 : 14);
   ctx.fillStyle = e.hitFlash > 0 ? '#fff' : e.color;
   const wob = Math.sin(e.wobble)*1.5;
 
-  if (e.boss) {
-    // spiky outer ring
-    const spikes = 10;
+  if (e.boss || e.subBoss) {
     ctx.rotate(e.wobble * 0.3);
-    ctx.beginPath();
-    for (let i=0;i<spikes*2;i++) {
-      const a = (Math.PI*2*i)/(spikes*2);
-      const rr = i%2===0 ? e.r + 10 + wob : e.r - 4;
-      const px = Math.cos(a)*rr, py = Math.sin(a)*rr;
-      if (i===0) ctx.moveTo(px,py); else ctx.lineTo(px,py);
+    switch (e.shape) {
+      case 'diamond': pathPolygon(e.r + 8, 4, wob); break;
+      case 'hex':     pathPolygon(e.r + 6, 6, wob); break;
+      case 'blob':    pathBlob(e.r + 6, e.wobble); break;
+      case 'crystal': pathCrystal(e.r + 8, wob); break;
+      default:        pathSpikyRing(e.r, wob, e.boss ? 10 : 7); break;
     }
-    ctx.closePath();
     ctx.fill();
     ctx.strokeStyle = 'rgba(255,255,255,0.4)';
     ctx.lineWidth = 2;
@@ -1273,9 +1452,10 @@ function loop(ts) {
   dt = Math.min(dt, 0.05);
 
   updateJoystickVisibility();
+  updateAdminBtnVisibility();
   if (rotateOverlay.classList.contains('show')) return;
 
-  if (gameState === 'playing') {
+  if (gameState === 'playing' && !adminPanelOpen) {
     elapsed += dt;
     updatePlayer(dt);
     updateEnemies(dt);
@@ -1287,9 +1467,10 @@ function loop(ts) {
     if (shakeTime > 0) { shakeTime -= dt; if (shakeTime<=0) shakeMag = 0; }
     updateHUD();
     render();
-  } else if (gameState === 'levelup' || gameState === 'paused') {
+  } else if (gameState === 'levelup' || gameState === 'paused' || (gameState === 'playing' && adminPanelOpen)) {
     // keep rendering current frame frozen-ish, still animate particles a touch
     updateParticles(dt*0.3);
+    updateHUD();
     render();
   } else if (gameState === 'gameover') {
     render();
@@ -1307,16 +1488,128 @@ function togglePause() {
   }
 }
 
+// ---------- Admin panel (unlocked by the admin secret code) ----------
+let adminPanelOpen = false;
+const adminBtn = document.getElementById('adminBtn');
+const adminPanel = document.getElementById('adminPanel');
+const adminBackdrop = document.getElementById('adminBackdrop');
+const adminStatsEl = document.getElementById('adminStats');
+const adminActionsEl = document.getElementById('adminActions');
+
+function round2(n) { return Math.round(n * 100) / 100; }
+
+const ADMIN_STATS = [
+  { key:'hp', label:'HP', min:0, max:99999, step:1, get:()=>player.hp, set:v=>{ player.hp = clamp(v, 0, player.maxHp); } },
+  { key:'maxHp', label:'Max HP', min:1, max:99999, step:1, get:()=>player.maxHp, set:v=>{ player.maxHp = Math.max(1, v); if (player.hp > player.maxHp) player.hp = player.maxHp; } },
+  { key:'level', label:'Level', min:1, max:9999, step:1, get:()=>player.level, set:v=>{ player.level = Math.max(1, Math.round(v)); } },
+  { key:'xp', label:'XP', min:0, max:999999, step:1, get:()=>player.xp, set:v=>{ player.xp = Math.max(0, v); } },
+  { key:'xpNeed', label:'XP to next lvl', min:1, max:999999, step:1, get:()=>player.xpNeed, set:v=>{ player.xpNeed = Math.max(1, v); } },
+  { key:'dmg', label:'Damage', min:0, max:99999, step:1, get:()=>player.dmg, set:v=>{ player.dmg = Math.max(0, v); } },
+  { key:'speed', label:'Move Speed', min:0, max:5000, step:10, get:()=>player.speed, set:v=>{ player.speed = Math.max(0, v); } },
+  { key:'fireRate', label:'Fire Rate (s)', min:0.02, max:3, step:0.01, get:()=>player.fireRate, set:v=>{ player.fireRate = Math.max(0.02, v); } },
+  { key:'projCount', label:'Projectiles', min:1, max:50, step:1, get:()=>player.projCount, set:v=>{ player.projCount = Math.max(1, Math.round(v)); } },
+  { key:'projSpeed', label:'Bullet Speed', min:50, max:5000, step:10, get:()=>player.projSpeed, set:v=>{ player.projSpeed = Math.max(50, v); } },
+  { key:'pierce', label:'Pierce', min:1, max:999, step:1, get:()=>player.pierce, set:v=>{ player.pierce = Math.max(1, Math.round(v)); } },
+  { key:'critChance', label:'Crit Chance (0-1)', min:0, max:1, step:0.05, get:()=>player.critChance, set:v=>{ player.critChance = clamp(v, 0, 1); } },
+  { key:'magnet', label:'Magnet Radius', min:0, max:5000, step:10, get:()=>player.magnet, set:v=>{ player.magnet = Math.max(0, v); } },
+  { key:'regen', label:'Regen /sec', min:0, max:999, step:1, get:()=>player.regen, set:v=>{ player.regen = Math.max(0, v); } },
+  { key:'score', label:'Score', min:0, max:99999999, step:10, get:()=>score, set:v=>{ score = Math.max(0, Math.round(v)); } },
+  { key:'wave', label:'Wave', min:1, max:9999, step:1, get:()=>waveNum, set:v=>{ enemies.length = 0; enemyBullets.length = 0; startWave(Math.max(1, Math.round(v))); } },
+  { key:'kills', label:'Kills', min:0, max:9999999, step:1, get:()=>kills, set:v=>{ kills = Math.max(0, Math.round(v)); } },
+];
+
+const ADMIN_ACTIONS = [
+  { label:'❤️ Full Heal', fn: () => { player.hp = player.maxHp; } },
+  { label:'⚡ Max Stats', fn: () => { player.dmg=500; player.speed=600; player.fireRate=0.05; player.pierce=20; player.projCount=8; player.critChance=1; player.projSpeed=1400; player.magnet=400; player.regen=10; } },
+  { label:'💀 Clear Enemies', fn: () => { enemies.length = 0; enemyBullets.length = 0; } },
+  { label:'👹 Spawn Boss', fn: () => { spawnBoss(); } },
+  { label:'⏭ Skip Wave', fn: () => { enemies.length = 0; enemyBullets.length = 0; startWave(waveNum + 1); } },
+  { label:'💰 +1000 Score', fn: () => { score += 1000; } },
+  { label:'⬆️ +1 Level', fn: () => { player.level += 1; player.xp = 0; } },
+  { label:'🧲 XP Burst', fn: () => { for (let i=0;i<5;i++) spawnGem(player.x + rand(-40,40), player.y + rand(-40,40), 20); } },
+];
+
+function buildAdminStats() {
+  adminStatsEl.innerHTML = '';
+  for (const s of ADMIN_STATS) {
+    const row = document.createElement('div');
+    row.className = 'adminRow';
+    row.innerHTML = `
+      <span class="adminLabel">${s.label}</span>
+      <div class="adminStepper">
+        <button type="button" class="stepBtn minus">−</button>
+        <input type="number" class="adminInput" step="${s.step}" min="${s.min}" max="${s.max}" data-key="${s.key}">
+        <button type="button" class="stepBtn plus">+</button>
+      </div>`;
+    const input = row.querySelector('input');
+    input.addEventListener('keydown', ev => ev.stopPropagation());
+    input.addEventListener('change', () => {
+      const v = parseFloat(input.value);
+      if (!isNaN(v)) s.set(v);
+      refreshAdminValues();
+    });
+    row.querySelector('.minus').addEventListener('click', () => { s.set(clamp(s.get() - s.step, s.min, s.max)); refreshAdminValues(); });
+    row.querySelector('.plus').addEventListener('click', () => { s.set(clamp(s.get() + s.step, s.min, s.max)); refreshAdminValues(); });
+    adminStatsEl.appendChild(row);
+  }
+}
+
+function refreshAdminValues() {
+  if (!player) return;
+  for (const s of ADMIN_STATS) {
+    const input = adminStatsEl.querySelector(`input.adminInput[data-key="${s.key}"]`);
+    if (input && document.activeElement !== input) input.value = round2(s.get());
+  }
+}
+
+function buildAdminActions() {
+  adminActionsEl.innerHTML = '';
+  for (const a of ADMIN_ACTIONS) {
+    const btn = document.createElement('button');
+    btn.className = 'adminActionBtn';
+    btn.textContent = a.label;
+    btn.onclick = () => { a.fn(); refreshAdminValues(); };
+    adminActionsEl.appendChild(btn);
+  }
+}
+
+function openAdminPanel() {
+  if (!player || !player.admin) return;
+  adminPanelOpen = true;
+  refreshAdminValues();
+  adminPanel.classList.add('open');
+  adminBackdrop.classList.add('show');
+}
+function closeAdminPanel() {
+  adminPanelOpen = false;
+  adminPanel.classList.remove('open');
+  adminBackdrop.classList.remove('show');
+}
+function toggleAdminPanel() {
+  if (!player || !player.admin) return;
+  adminPanelOpen ? closeAdminPanel() : openAdminPanel();
+}
+function updateAdminBtnVisibility() {
+  const show = !!(player && player.admin && gameState === 'playing');
+  adminBtn.classList.toggle('show', show);
+  if (!show && adminPanelOpen) closeAdminPanel();
+}
+
+adminBtn.addEventListener('click', () => { ensureAudio(); toggleAdminPanel(); });
+document.getElementById('adminCloseBtn').addEventListener('click', closeAdminPanel);
+adminBackdrop.addEventListener('click', closeAdminPanel);
+buildAdminStats();
+buildAdminActions();
+
 // ---------- Boot ----------
 function startGame() {
   ensureAudio();
   resetGame();
-  waveTimer = 25;
+  startWave(1);
   gameState = 'playing';
   document.getElementById('startScreen').style.display = 'none';
   document.getElementById('gameOverScreen').style.display = 'none';
   document.getElementById('bossBar').classList.remove('show');
-  showCenterMsg('WAVE 1');
 }
 
 // ---------- Back to menu ----------
