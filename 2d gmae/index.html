@@ -779,6 +779,7 @@ let player, enemies, bullets, gems, waveNum, elapsed, score, kills, gameState;
 let waveEnemiesTotal = 0, waveEnemiesSpawned = 0, waveBreather = 0;
 let spawnAccum = 0;
 let cam = {x:0, y:0};
+let hazards = [];
 
 function makePlayer() {
   const p = {
@@ -794,6 +795,7 @@ function makePlayer() {
     invuln: 0,
     facing: {x:1, y:0},
     admin: false,
+    slowUntil: 0, slowMul: 1,
   };
   applyUnlockedBuffs(p);
   return p;
@@ -801,7 +803,7 @@ function makePlayer() {
 
 function resetGame() {
   player = makePlayer();
-  enemies = []; bullets = []; gems = []; particles = []; floaters = [];
+  enemies = []; bullets = []; gems = []; particles = []; floaters = []; hazards = [];
   waveNum = 0; elapsed = 0; score = 0; kills = 0; spawnAccum = 0;
   waveEnemiesTotal = 0; waveEnemiesSpawned = 0; waveBreather = 0;
   shakeTime = 0; shakeMag = 0;
@@ -849,18 +851,18 @@ function spawnEnemy() {
 
 // ---------- Boss & Sub-boss skins ----------
 const BOSS_SKINS = [
-  { name: 'Crimson Reaper',  color: '#ff2b6b', glow: 'rgba(255,43,107,0.8)',  shape: 'spiky'   },
-  { name: 'Void Serpent',    color: '#a25bff', glow: 'rgba(162,91,255,0.85)', shape: 'diamond' },
-  { name: 'Golden Juggernaut', color: '#ffd24d', glow: 'rgba(255,210,77,0.85)', shape: 'hex'   },
-  { name: 'Toxic Horror',    color: '#5bffb0', glow: 'rgba(91,255,176,0.85)', shape: 'blob'    },
-  { name: 'Frost Sovereign', color: '#5be3ff', glow: 'rgba(91,227,255,0.9)',  shape: 'crystal' },
+  { name: 'Crimson Reaper',    color: '#ff2b6b', glow: 'rgba(255,43,107,0.8)',  shape: 'spiky',   ability: 'dash',        abilityName: 'Blood Dash' },
+  { name: 'Void Serpent',      color: '#a25bff', glow: 'rgba(162,91,255,0.85)', shape: 'diamond', ability: 'blinkBurst',  abilityName: 'Void Blink' },
+  { name: 'Golden Juggernaut', color: '#ffd24d', glow: 'rgba(255,210,77,0.85)', shape: 'hex',     ability: 'slam',        abilityName: 'Ground Slam' },
+  { name: 'Toxic Horror',      color: '#5bffb0', glow: 'rgba(91,255,176,0.85)', shape: 'blob',    ability: 'spores',      abilityName: 'Toxic Spores' },
+  { name: 'Frost Sovereign',   color: '#5be3ff', glow: 'rgba(91,227,255,0.9)',  shape: 'crystal', ability: 'frostVolley', abilityName: 'Frost Volley' },
 ];
 const SUBBOSS_SKINS = [
-  { name: 'Iron Sentinel', color: '#c9d6e8', glow: 'rgba(201,214,232,0.8)', shape: 'hex'     },
-  { name: 'Blaze Hound',   color: '#ff8a3d', glow: 'rgba(255,138,61,0.8)',  shape: 'diamond' },
-  { name: 'Shadow Stalker',color: '#8a5bff', glow: 'rgba(138,91,255,0.8)', shape: 'spiky'    },
-  { name: 'Storm Bringer', color: '#5bc8ff', glow: 'rgba(91,200,255,0.8)', shape: 'crystal'  },
-  { name: 'Plague Bloat',  color: '#9bff5b', glow: 'rgba(155,255,91,0.8)', shape: 'blob'     },
+  { name: 'Iron Sentinel',  color: '#c9d6e8', glow: 'rgba(201,214,232,0.8)', shape: 'hex',     ability: 'shield',    abilityName: 'Bulwark Shield' },
+  { name: 'Blaze Hound',    color: '#ff8a3d', glow: 'rgba(255,138,61,0.8)',  shape: 'diamond', ability: 'sprint',    abilityName: 'Blaze Sprint' },
+  { name: 'Shadow Stalker', color: '#8a5bff', glow: 'rgba(138,91,255,0.8)', shape: 'spiky',   ability: 'blink',     abilityName: 'Shadow Blink' },
+  { name: 'Storm Bringer',  color: '#5bc8ff', glow: 'rgba(91,200,255,0.8)', shape: 'crystal', ability: 'lightning', abilityName: 'Lightning Strike' },
+  { name: 'Plague Bloat',   color: '#9bff5b', glow: 'rgba(155,255,91,0.8)', shape: 'blob',    ability: 'summon',    abilityName: 'Spawn Broodlings' },
 ];
 
 function spawnBossLike(isSub) {
@@ -888,10 +890,160 @@ function spawnBossLike(isSub) {
     hp, maxHp: hp, speed, color: skin.color, glow: skin.glow,
     dmg, xp, score, ranged: false, atkCd: 0,
     hitFlash: 0, wobble: rand(0, TAU),
+    ability: skin.ability, abilityName: skin.abilityName,
+    abilityCd: rand(1.8, 3), telegraph: null,
+    dashDir: null, dashUntil: 0, shieldUntil: 0, trailAccum: 0,
   });
 }
 function spawnBoss() { spawnBossLike(false); }
 function spawnSubBoss() { spawnBossLike(true); }
+
+// ---------- Boss & sub-boss special powers ----------
+function spawnBroodling(x, y) {
+  const base = ENEMY_TYPES.grunt;
+  const scale = 0.5 + (waveNum-1) * 0.08;
+  enemies.push({
+    type: 'grunt', x: clamp(x, 20, WORLD.w-20), y: clamp(y, 20, WORLD.h-20), r: base.r * 0.8,
+    hp: base.hp * scale, maxHp: base.hp * scale,
+    speed: base.speed * 1.1,
+    color: base.color, glow: base.glow, dmg: base.dmg * 0.7, xp: base.xp, score: base.score,
+    ranged: false, atkCd: 0, hitFlash: 0, wobble: rand(0, TAU),
+  });
+}
+
+function triggerAbility(e, dx, dy, d) {
+  switch (e.ability) {
+    case 'dash':
+      e.dashDir = { x: dx/d, y: dy/d };
+      e.dashUntil = elapsed + 0.5;
+      e.abilityCd = rand(3.5, 4.5);
+      spawnBurst(e.x, e.y, e.color, 14, 200, 0.35, 3);
+      break;
+    case 'blinkBurst': {
+      const a = rand(0, TAU), dd = rand(160, 240);
+      e.x = clamp(player.x + Math.cos(a)*dd, e.r, WORLD.w-e.r);
+      e.y = clamp(player.y + Math.sin(a)*dd, e.r, WORLD.h-e.r);
+      spawnBurst(e.x, e.y, e.color, 20, 220, 0.4, 3);
+      const n = 8;
+      for (let i=0;i<n;i++) {
+        const ba = (TAU*i)/n;
+        enemyBullets.push({ x: e.x, y: e.y, vx: Math.cos(ba)*190, vy: Math.sin(ba)*190, r: 5, dmg: e.dmg*0.7, life: 2.2 });
+      }
+      e.abilityCd = rand(4.5, 5.5);
+      break;
+    }
+    case 'slam':
+      e.telegraph = { type: 'slam', t: 0.55, maxT: 0.55 };
+      e.abilityCd = rand(4.5, 5.5);
+      break;
+    case 'spores':
+      for (let i=0;i<3;i++) {
+        const a = rand(0, TAU), rr = rand(0, 90);
+        hazards.push({ type: 'poison', x: player.x + Math.cos(a)*rr, y: player.y + Math.sin(a)*rr, r: 46, life: 6, maxLife: 6, dmg: e.dmg*0.35, tick: 0 });
+      }
+      e.abilityCd = rand(3.5, 4.5);
+      break;
+    case 'frostVolley': {
+      const n = 6;
+      const baseAngle = Math.atan2(dy, dx);
+      for (let i=0;i<n;i++) {
+        const a = baseAngle - 0.4 + (0.8*i)/(n-1);
+        enemyBullets.push({ x: e.x, y: e.y, vx: Math.cos(a)*260, vy: Math.sin(a)*260, r: 5, dmg: e.dmg*0.6, life: 2.4, slow: true });
+      }
+      e.abilityCd = rand(4, 5);
+      break;
+    }
+    case 'shield':
+      e.shieldUntil = elapsed + 2.5;
+      e.abilityCd = rand(6, 7);
+      break;
+    case 'sprint':
+      e.dashDir = { x: dx/d, y: dy/d };
+      e.dashUntil = elapsed + 1;
+      e.abilityCd = rand(4, 5);
+      break;
+    case 'blink': {
+      const a = rand(0, TAU), dd = rand(60, 100);
+      e.x = clamp(player.x + Math.cos(a)*dd, e.r, WORLD.w-e.r);
+      e.y = clamp(player.y + Math.sin(a)*dd, e.r, WORLD.h-e.r);
+      spawnBurst(e.x, e.y, e.color, 16, 200, 0.35, 3);
+      e.abilityCd = rand(3.5, 4.5);
+      break;
+    }
+    case 'lightning':
+      e.telegraph = { type: 'lightning', t: 0.8, maxT: 0.8, x: player.x, y: player.y };
+      e.abilityCd = rand(4, 5);
+      break;
+    case 'summon':
+      for (let i=0;i<2;i++) {
+        const a = rand(0, TAU), rr = rand(30, 60);
+        spawnBroodling(e.x + Math.cos(a)*rr, e.y + Math.sin(a)*rr);
+      }
+      e.abilityCd = rand(5, 6);
+      break;
+  }
+}
+
+function resolveTelegraph(e) {
+  if (e.telegraph.type === 'slam') {
+    const dd = dist(e.x, e.y, player.x, player.y);
+    if (dd < e.r + 90) {
+      damagePlayer(e.dmg * 1.3);
+      const pm = dd || 1;
+      player.x = clamp(player.x + ((player.x-e.x)/pm)*120, player.r, WORLD.w - player.r);
+      player.y = clamp(player.y + ((player.y-e.y)/pm)*120, player.r, WORLD.h - player.r);
+    }
+    spawnBurst(e.x, e.y, e.color, 30, 260, 0.45, 4);
+    addShake(8, 0.3);
+  } else if (e.telegraph.type === 'lightning') {
+    if (dist(player.x, player.y, e.telegraph.x, e.telegraph.y) < 60) damagePlayer(e.dmg * 1.5);
+    spawnBurst(e.telegraph.x, e.telegraph.y, e.color, 26, 240, 0.4, 3);
+    addShake(6, 0.25);
+  }
+}
+
+function updateBossAI(e, dx, dy, d, dt) {
+  if (e.telegraph) {
+    e.telegraph.t -= dt;
+    if (e.telegraph.t <= 0) { resolveTelegraph(e); e.telegraph = null; }
+    return;
+  }
+  if (e.dashUntil > elapsed) {
+    const dm = e.dashDir || { x: dx/d, y: dy/d };
+    const dashSpeed = e.speed * (e.ability === 'sprint' ? 2.4 : 3.2);
+    e.x += dm.x * dashSpeed * dt;
+    e.y += dm.y * dashSpeed * dt;
+    if (e.ability === 'sprint') {
+      e.trailAccum += dt;
+      if (e.trailAccum > 0.07) {
+        e.trailAccum = 0;
+        hazards.push({ type: 'fire', x: e.x, y: e.y, r: 20, life: 1.5, maxLife: 1.5, dmg: e.dmg*0.6, tick: 0 });
+      }
+    }
+  } else {
+    e.x += (dx/d) * e.speed * dt;
+    e.y += (dy/d) * e.speed * dt;
+  }
+  e.x = clamp(e.x, e.r, WORLD.w - e.r);
+  e.y = clamp(e.y, e.r, WORLD.h - e.r);
+
+  e.abilityCd -= dt;
+  if (e.abilityCd <= 0) triggerAbility(e, dx, dy, d);
+}
+
+function updateHazards(dt) {
+  for (let i = hazards.length-1; i>=0; i--) {
+    const hz = hazards[i];
+    hz.life -= dt;
+    hz.tick -= dt;
+    if (hz.tick <= 0 && dist(hz.x, hz.y, player.x, player.y) < hz.r + player.r) {
+      damagePlayer(hz.dmg);
+      hz.tick = 0.5;
+      if (hz.type === 'poison') player.slowUntil = Math.max(player.slowUntil, elapsed + 0.3);
+    }
+    if (hz.life <= 0) hazards.splice(i,1);
+  }
+}
 
 // ---------- Enemy projectiles (spitter) ----------
 let enemyBullets = [];
@@ -1044,10 +1196,11 @@ function updatePlayer(dt) {
   if (keys['d'] || keys['arrowright']) mx += 1;
   if (joyVec.x || joyVec.y) { mx += joyVec.x; my += joyVec.y; }
   const m = Math.hypot(mx, my);
+  player.slowMul = elapsed < player.slowUntil ? 0.55 : 1;
   if (m > 0.01) {
     mx /= m; my /= m;
-    player.x += mx * player.speed * dt;
-    player.y += my * player.speed * dt;
+    player.x += mx * player.speed * player.slowMul * dt;
+    player.y += my * player.speed * player.slowMul * dt;
   }
   player.x = clamp(player.x, player.r, WORLD.w - player.r);
   player.y = clamp(player.y, player.r, WORLD.h - player.r);
@@ -1074,7 +1227,9 @@ function updateEnemies(dt) {
     e.wobble += dt * 6;
     const dx = player.x - e.x, dy = player.y - e.y;
     const d = Math.hypot(dx, dy) || 1;
-    if (e.ranged) {
+    if (e.boss || e.subBoss) {
+      updateBossAI(e, dx, dy, d, dt);
+    } else if (e.ranged) {
       const preferred = 260;
       const dir = d > preferred ? 1 : -1;
       e.x += (dx/d) * e.speed * dir * dt * 0.6;
@@ -1094,9 +1249,14 @@ function updateEnemies(dt) {
     // (skipped heavy O(n^2) for perf on large counts; only check nearby via simple sample)
 
     if (d < player.r + e.r) {
-      damagePlayer(e.dmg * dt * 3.2);
+      const contactDmg = e.dmg * dt * 3.2;
+      damagePlayer(contactDmg);
+      if (e.ability === 'dash' && e.dashUntil > elapsed) {
+        e.hp = Math.min(e.maxHp, e.hp + contactDmg * 0.5);
+      }
     }
   }
+  updateHazards(dt);
 }
 
 function updateBullets(dt) {
@@ -1109,7 +1269,8 @@ function updateBullets(dt) {
       for (let j=enemies.length-1;j>=0;j--) {
         const e = enemies[j];
         if (dist2(b.x,b.y,e.x,e.y) < (b.r+e.r)*(b.r+e.r)) {
-          const dmg = b.crit ? b.dmg*2 : b.dmg;
+          let dmg = b.crit ? b.dmg*2 : b.dmg;
+          if (e.shieldUntil > elapsed) dmg *= 0.2;
           e.hp -= dmg; e.hitFlash = 0.1;
           spawnFloater(e.x, e.y - e.r - 4, Math.round(dmg).toString(), b.crit ? '#ffd24d' : '#fff', b.crit?16:12);
           spawnBurst(b.x, b.y, '#5be3ff', 3, 90, 0.2, 2);
@@ -1129,6 +1290,7 @@ function updateBullets(dt) {
     let dead = b.life <= 0;
     if (!dead && dist2(b.x,b.y,player.x,player.y) < (b.r+player.r)*(b.r+player.r)) {
       damagePlayer(b.dmg); dead = true;
+      if (b.slow) player.slowUntil = elapsed + 2;
     }
     if (dead) enemyBullets.splice(i,1);
   }
@@ -1225,7 +1387,8 @@ function updateHUD() {
   if (boss) {
     bossBar.classList.add('show');
     const nameEl = document.getElementById('bossName');
-    nameEl.textContent = boss.boss ? `BOSS ${boss.bossNum} — ${boss.name.toUpperCase()}` : `SUB-BOSS — ${boss.name.toUpperCase()}`;
+    const tag = boss.boss ? `BOSS ${boss.bossNum} — ${boss.name.toUpperCase()}` : `SUB-BOSS — ${boss.name.toUpperCase()}`;
+    nameEl.textContent = boss.abilityName ? `${tag} (${boss.abilityName.toUpperCase()})` : tag;
     nameEl.style.color = boss.color;
     nameEl.style.textShadow = `0 0 12px ${boss.glow}`;
     const fill = document.getElementById('bossFill');
@@ -1355,6 +1518,31 @@ function drawEnemy(e, cx, cy) {
   }
   ctx.restore();
 
+  if (e.shieldUntil > elapsed) {
+    ctx.save();
+    ctx.translate(sx, sy);
+    ctx.strokeStyle = 'rgba(201,214,232,0.85)';
+    ctx.lineWidth = 3;
+    ctx.shadowColor = 'rgba(201,214,232,0.9)'; ctx.shadowBlur = 12;
+    ctx.beginPath(); ctx.arc(0, 0, e.r + 14, 0, TAU); ctx.stroke();
+    ctx.restore();
+  }
+  if (e.telegraph) {
+    ctx.save();
+    const tp = 1 - clamp(e.telegraph.t / e.telegraph.maxT, 0, 1);
+    if (e.telegraph.type === 'slam') {
+      ctx.strokeStyle = `rgba(255,80,80,${0.3 + tp*0.5})`;
+      ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.arc(sx, sy, e.r + 90, 0, TAU); ctx.stroke();
+    } else if (e.telegraph.type === 'lightning') {
+      const lx = e.telegraph.x - cx + W/2, ly = e.telegraph.y - cy + H/2;
+      ctx.strokeStyle = `rgba(255,220,80,${0.3 + tp*0.6})`;
+      ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.arc(lx, ly, 60 * (1 - tp*0.3), 0, TAU); ctx.stroke();
+    }
+    ctx.restore();
+  }
+
   // hp bar for tougher enemies
   if (e.maxHp > 20 && e.hp < e.maxHp) {
     const w = e.r*2;
@@ -1378,9 +1566,23 @@ function drawBullets(cx, cy) {
   for (const b of enemyBullets) {
     const sx = b.x-cx+W/2, sy = b.y-cy+H/2;
     ctx.save();
-    ctx.shadowColor = 'rgba(91,255,176,0.9)'; ctx.shadowBlur = 10;
-    ctx.fillStyle = '#5bffb0';
+    const col = b.slow ? '#5be3ff' : '#5bffb0';
+    ctx.shadowColor = col; ctx.shadowBlur = 10;
+    ctx.fillStyle = col;
     ctx.beginPath(); ctx.arc(sx, sy, 5, 0, TAU); ctx.fill();
+    ctx.restore();
+  }
+}
+
+function drawHazards(cx, cy) {
+  for (const hz of hazards) {
+    const sx = hz.x-cx+W/2, sy = hz.y-cy+H/2;
+    const fade = clamp(hz.life / hz.maxLife, 0, 1);
+    ctx.save();
+    ctx.globalAlpha = 0.25 + fade*0.25;
+    ctx.fillStyle = hz.type === 'poison' ? '#5bffb0' : '#ff8a3d';
+    ctx.shadowColor = ctx.fillStyle; ctx.shadowBlur = 14;
+    ctx.beginPath(); ctx.arc(sx, sy, hz.r, 0, TAU); ctx.fill();
     ctx.restore();
   }
 }
@@ -1426,6 +1628,7 @@ function render() {
   cam.x = cx; cam.y = cy;
 
   drawGrid(cx, cy);
+  drawHazards(cx, cy);
   drawGems(cx, cy);
   for (const e of enemies) drawEnemy(e, cx, cy);
   drawBullets(cx, cy);
@@ -1514,16 +1717,16 @@ const ADMIN_STATS = [
   { key:'magnet', label:'Magnet Radius', min:0, max:5000, step:10, get:()=>player.magnet, set:v=>{ player.magnet = Math.max(0, v); } },
   { key:'regen', label:'Regen /sec', min:0, max:999, step:1, get:()=>player.regen, set:v=>{ player.regen = Math.max(0, v); } },
   { key:'score', label:'Score', min:0, max:99999999, step:10, get:()=>score, set:v=>{ score = Math.max(0, Math.round(v)); } },
-  { key:'wave', label:'Wave', min:1, max:9999, step:1, get:()=>waveNum, set:v=>{ enemies.length = 0; enemyBullets.length = 0; startWave(Math.max(1, Math.round(v))); } },
+  { key:'wave', label:'Wave', min:1, max:9999, step:1, get:()=>waveNum, set:v=>{ enemies.length = 0; enemyBullets.length = 0; hazards.length = 0; startWave(Math.max(1, Math.round(v))); } },
   { key:'kills', label:'Kills', min:0, max:9999999, step:1, get:()=>kills, set:v=>{ kills = Math.max(0, Math.round(v)); } },
 ];
 
 const ADMIN_ACTIONS = [
   { label:'❤️ Full Heal', fn: () => { player.hp = player.maxHp; } },
   { label:'⚡ Max Stats', fn: () => { player.dmg=500; player.speed=600; player.fireRate=0.05; player.pierce=20; player.projCount=8; player.critChance=1; player.projSpeed=1400; player.magnet=400; player.regen=10; } },
-  { label:'💀 Clear Enemies', fn: () => { enemies.length = 0; enemyBullets.length = 0; } },
+  { label:'💀 Clear Enemies', fn: () => { enemies.length = 0; enemyBullets.length = 0; hazards.length = 0; } },
   { label:'👹 Spawn Boss', fn: () => { spawnBoss(); } },
-  { label:'⏭ Skip Wave', fn: () => { enemies.length = 0; enemyBullets.length = 0; startWave(waveNum + 1); } },
+  { label:'⏭ Skip Wave', fn: () => { enemies.length = 0; enemyBullets.length = 0; hazards.length = 0; startWave(waveNum + 1); } },
   { label:'💰 +1000 Score', fn: () => { score += 1000; } },
   { label:'⬆️ +1 Level', fn: () => { player.level += 1; player.xp = 0; } },
   { label:'🧲 XP Burst', fn: () => { for (let i=0;i<5;i++) spawnGem(player.x + rand(-40,40), player.y + rand(-40,40), 20); } },
